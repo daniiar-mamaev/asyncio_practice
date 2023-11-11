@@ -4,7 +4,10 @@ import aiosqlite
 from aiohttp import ClientSession, web
 from aiologger.loggers.json import JsonLogger
 from datetime import datetime
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
 logger = JsonLogger.with_default_handlers(
     level=10,
@@ -45,27 +48,27 @@ async def get_weather(city):
 async def get_translation(text, source, target):
     await logger.info(f"Поступил запрос на перевод слова: {text}")
 
-    url = 'https://ru.libretranslate.com/translate'
+    url = 'https://api-translate.systran.net/translation/text/translate'
 
-    data = {'q': text, 'source': source, 'target': target, 'format': 'text'}
+    data = {'input': text, 'source': source, 'target': target, 'format': 'text', 'key': os.getenv('systran_key')}
 
     #используем единую сессию
     async with app_storage['session'].post(url, json=data) as response:
         translate_json = await response.json()
 
         try:
-            return translate_json['translatedText']
+            return translate_json['outputs'][0]['output']
         except KeyError:
             logger.error(f'Невозможно получить перевод для слова: {text}')
             return text
 
 
 async def handle(request):
-    city_ru = request.rel_url.query['city']
+    city_en = request.rel_url.query['city']
 
-    await logger.info(f'Поступил запрос на город: {city_ru}')
+    await logger.info(f'Поступил запрос на город: {city_en}')
 
-    city_en = await get_translation(city_ru, 'ru', 'en')
+    city_ru = await get_translation(city_en, 'en', 'ru')
 
     weather_en = await get_weather(city_en)
     weather_ru = await get_translation(weather_en, 'en', 'ru')
